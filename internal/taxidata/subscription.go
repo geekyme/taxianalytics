@@ -7,26 +7,31 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sync"
 
 	"cloud.google.com/go/pubsub"
+	"github.com/fatih/structs"
+	influx "github.com/influxdata/influxdb1-client/v2"
 	"google.golang.org/api/option"
 )
 
 var (
 	// TaxiSubscription points to the active subscription we have on the taxi topic
 	TaxiSubscription *pubsub.Subscription
+	// DBClient points to the influx database client
+	DBClient influx.Client
 )
 
-const topicEnv = "TAXI_TOPIC"
-const projectEnv = "TAXI_PROJECT"
-const keyEnv = "GCLOUD_KEY"
-
-var mutex = &sync.Mutex{}
-var state = []TaxiData{}
+const (
+	topicEnv   = "TAXI_TOPIC"
+	keyEnv     = "GCLOUD_KEY"
+	projectEnv = "TAXI_PROJECT"
+	dbHostEnv  = "DB_HOST"
+	dbName     = "taxianalytics"
+	seriesName = "rides"
+)
 
 func init() {
-	topic, project, key := os.Getenv(topicEnv), os.Getenv(projectEnv), os.Getenv(keyEnv)
+	topic, project, key, dbHost := os.Getenv(topicEnv), os.Getenv(projectEnv), os.Getenv(keyEnv), os.Getenv(dbHostEnv)
 	if topic == "" {
 		log.Fatal(fmt.Sprintf("Must set env variable: %s", topicEnv))
 	}
@@ -36,9 +41,20 @@ func init() {
 	if key == "" {
 		log.Fatal(fmt.Sprintf("Must set env variable: %s", keyEnv))
 	}
+	if dbHost == "" {
+		log.Fatal(fmt.Sprintf("Must set env variable: %s", dbHostEnv))
+	}
 
 	var err error
 	TaxiSubscription, err = configureSubscription([]byte(key), project, topic)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	DBClient, err = influx.NewHTTPClient(influx.HTTPConfig{
+		Addr: dbHost,
+	})
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,17 +81,20 @@ func Subscribe(subscription *pubsub.Subscription) {
 	ctx := context.Background()
 	err := subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		var data TaxiData
-		if err := json.Unmarshal(msg.Data, &data); err != nil {
+		var err error
+		if err = json.Unmarshal(msg.Data, &data); err != nil {
 			log.Printf("could not decode message data: %#v", msg)
 			msg.Ack()
 			return
 		}
 
-		mutex.Lock()
-		state = append(state, data)
-		mutex.Unlock()
+		if err = Insert(DBClient, dbName, data); err == nil {
+			msg.Ack()
+			return
+		}
 
-		msg.Ack()
+		log.Printf("Error in subscription handler %v", err)
+		msg.Nack()
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -84,6 +103,70 @@ func Subscribe(subscription *pubsub.Subscription) {
 
 // Handler writes current state of the taxi data to the requester
 func Handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Count: %d\n", len(state))
-	json.NewEncoder(w).Encode(state)
+	res, err := getAllInLast(DBClient, "1h")
+
+	if err != nil {
+		log.Printf("Error fetching ride statistics: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Something bad happened!"))
+	} else {
+		json.NewEncoder(w).Encode(res)
+	}
+}
+
+type queryResult struct {
+	Count int64 `json:"count"`
+}
+
+func getAllInLast(c influx.Client, timeframe string) (*queryResult, error) {
+	expression := fmt.Sprintf("select count(RideID) from %s where time > now() - %s", seriesName, timeframe)
+	q := influx.NewQuery(expression, dbName, "ns")
+	response, err := c.Query(q)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err = response.Error(); err != nil {
+		return nil, err
+	}
+
+	if response.Results[0].Series == nil {
+		return &queryResult{Count: 0}, nil
+	} else {
+		num, err := response.Results[0].Series[0].Values[0][1].(json.Number).Int64()
+		if err != nil {
+			return nil, err
+		}
+
+		return &queryResult{Count: num}, nil
+	}
+}
+
+// Insert saves points to database
+func Insert(c influx.Client, dbName string, data TaxiData) error {
+	// Create a new point batch
+	bp, err := influx.NewBatchPoints(influx.BatchPointsConfig{
+		Database: dbName,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Create a point and add to batch
+	tags := map[string]string{}
+	fields := structs.Map(data)
+
+	pt, err := influx.NewPoint(seriesName, tags, fields, data.Timestamp)
+	if err != nil {
+		return err
+	}
+	bp.AddPoint(pt)
+
+	// Write the batch
+	if err := c.Write(bp); err != nil {
+		return err
+	}
+
+	return nil
 }
