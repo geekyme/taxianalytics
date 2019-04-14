@@ -20,7 +20,7 @@ var (
 
 const topicEnv = "TAXI_TOPIC"
 const projectEnv = "TAXI_PROJECT"
-const keyEnv = "TAXI_KEY"
+const keyEnv = "GCLOUD_KEY"
 
 var mutex = &sync.Mutex{}
 var state = []TaxiData{}
