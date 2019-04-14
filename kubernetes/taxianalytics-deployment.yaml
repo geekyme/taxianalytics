@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taxianalytics
+  labels:
+    app: taxianalytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: taxianalytics
+  template:
+    metadata:
+      labels:
+        app: taxianalytics
+    spec:
+      containers:
+      - name: taxianalytics
+        image: $DOCKER_IMAGE_TAG
+        # We are using a local image here
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
