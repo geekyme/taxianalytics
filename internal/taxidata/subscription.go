@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"cloud.google.com/go/pubsub"
+	"google.golang.org/api/option"
 )
 
 var (
@@ -19,29 +20,33 @@ var (
 
 const topicEnv = "TAXI_TOPIC"
 const projectEnv = "TAXI_PROJECT"
+const keyEnv = "TAXI_KEY"
 
 var mutex = &sync.Mutex{}
 var state = []TaxiData{}
 
 func init() {
-	topic, project := os.Getenv(topicEnv), os.Getenv(projectEnv)
+	topic, project, key := os.Getenv(topicEnv), os.Getenv(projectEnv), os.Getenv(keyEnv)
 	if topic == "" {
 		log.Fatal(fmt.Sprintf("Must set env variable: %s", topicEnv))
 	}
 	if project == "" {
 		log.Fatal(fmt.Sprintf("Must set env variable: %s", projectEnv))
 	}
+	if key == "" {
+		log.Fatal(fmt.Sprintf("Must set env variable: %s", keyEnv))
+	}
 
 	var err error
-	TaxiSubscription, err = configureSubscription(project, topic)
+	TaxiSubscription, err = configureSubscription([]byte(key), project, topic)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func configureSubscription(project, topic string) (*pubsub.Subscription, error) {
+func configureSubscription(key []byte, project, topic string) (*pubsub.Subscription, error) {
 	ctx := context.Background()
-	client, err := pubsub.NewClient(ctx, project)
+	client, err := pubsub.NewClient(ctx, project, option.WithCredentialsJSON(key))
 	if err != nil {
 		return nil, err
 	}
