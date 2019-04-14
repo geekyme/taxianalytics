@@ -22,12 +22,13 @@ var (
 )
 
 const (
-	topicEnv   = "TAXI_TOPIC"
-	keyEnv     = "GCLOUD_KEY"
-	projectEnv = "TAXI_PROJECT"
-	dbHostEnv  = "DB_HOST"
-	dbName     = "taxianalytics"
-	seriesName = "rides"
+	topicEnv    = "TAXI_TOPIC"
+	keyEnv      = "GCLOUD_KEY"
+	projectEnv  = "TAXI_PROJECT"
+	dbHostEnv   = "DB_HOST"
+	dbName      = "taxianalytics"
+	seriesName  = "rides"
+	bufferCount = 500
 )
 
 func init() {
@@ -79,25 +80,48 @@ func configureSubscription(key []byte, project, topic string) (*pubsub.Subscript
 // Subscribe takes in a subscription and runs callback functions
 func Subscribe(subscription *pubsub.Subscription) {
 	ctx := context.Background()
+	bufCh := make(chan TaxiData, bufferCount)
+	go batchWriter(bufCh)
+
 	err := subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		var data TaxiData
 		var err error
 		if err = json.Unmarshal(msg.Data, &data); err != nil {
 			log.Printf("could not decode message data: %#v", msg)
-			msg.Ack()
+			msg.Nack()
 			return
 		}
 
-		if err = Insert(DBClient, dbName, data); err == nil {
-			msg.Ack()
-			return
-		}
-
-		log.Printf("Error in subscription handler %v", err)
-		msg.Nack()
+		bufCh <- data
+		msg.Ack()
 	})
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func batchWriter(ch chan TaxiData) {
+	for {
+		var items []TaxiData
+
+		items = append(items, <-ch)
+
+		// we batch write at half the channel buffer length each time
+		// so that the channel can continue accumulating items during the write
+		remains := (bufferCount / 2) - 1
+
+		for i := 0; i < remains; i++ {
+			select {
+			case item := <-ch:
+				items = append(items, item)
+			default:
+				break
+			}
+		}
+
+		if err := Insert(DBClient, dbName, items); err != nil {
+			log.Printf("Error inserting data points in batch: %v", err)
+		}
 	}
 }
 
@@ -144,7 +168,7 @@ func getAllInLast(c influx.Client, timeframe string) (*queryResult, error) {
 }
 
 // Insert saves points to database
-func Insert(c influx.Client, dbName string, data TaxiData) error {
+func Insert(c influx.Client, dbName string, items []TaxiData) error {
 	// Create a new point batch
 	bp, err := influx.NewBatchPoints(influx.BatchPointsConfig{
 		Database: dbName,
@@ -153,15 +177,17 @@ func Insert(c influx.Client, dbName string, data TaxiData) error {
 		return err
 	}
 
-	// Create a point and add to batch
-	tags := map[string]string{}
-	fields := structs.Map(data)
+	for _, data := range items {
+		// Create a point and add to batch
+		tags := map[string]string{}
+		fields := structs.Map(data)
 
-	pt, err := influx.NewPoint(seriesName, tags, fields, data.Timestamp)
-	if err != nil {
-		return err
+		pt, err := influx.NewPoint(seriesName, tags, fields, data.Timestamp)
+		if err != nil {
+			return err
+		}
+		bp.AddPoint(pt)
 	}
-	bp.AddPoint(pt)
 
 	// Write the batch
 	if err := c.Write(bp); err != nil {
