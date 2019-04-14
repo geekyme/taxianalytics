@@ -19,5 +19,12 @@ spec:
         image: $DOCKER_IMAGE_TAG
         # We are using a local image here
         imagePullPolicy: Never
+        env:
+        - name: GCLOUD_KEY
+          value: '$GCLOUD_KEY'
+        - name: TAXI_TOPIC
+          value: $TAXI_TOPIC
+        - name: TAXI_PROJECT
+          value: $TAXI_PROJECT
         ports:
         - containerPort: 8080
