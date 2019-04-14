@@ -17,6 +17,12 @@ then
   exit 1
 fi
 
+if [ -z "$DB_HOST" ]
+then
+  echo "env DB_HOST must be set!"
+  exit 1
+fi
+
 echo "#### Current version: $VERSION"
 export DOCKER_IMAGE_TAG=local/$APP:$VERSION
 

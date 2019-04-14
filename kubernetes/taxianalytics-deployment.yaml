@@ -26,5 +26,7 @@ spec:
           value: $TAXI_TOPIC
         - name: TAXI_PROJECT
           value: $TAXI_PROJECT
+        - name: DB_HOST
+          value: $DB_HOST
         ports:
         - containerPort: 8080
