@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 
 	"cloud.google.com/go/pubsub"
@@ -14,21 +13,18 @@ import (
 	"google.golang.org/api/option"
 )
 
+const (
+	topicEnv   = "TAXI_TOPIC"
+	keyEnv     = "GCLOUD_KEY"
+	projectEnv = "TAXI_PROJECT"
+	dbHostEnv  = "DB_HOST"
+)
+
 var (
 	// TaxiSubscription points to the active subscription we have on the taxi topic
 	TaxiSubscription *pubsub.Subscription
 	// DBClient points to the influx database client
 	DBClient influx.Client
-)
-
-const (
-	topicEnv    = "TAXI_TOPIC"
-	keyEnv      = "GCLOUD_KEY"
-	projectEnv  = "TAXI_PROJECT"
-	dbHostEnv   = "DB_HOST"
-	dbName      = "taxianalytics"
-	seriesName  = "rides"
-	bufferCount = 500
 )
 
 func init() {
@@ -125,51 +121,6 @@ func batchWriter(ch chan TaxiData) {
 		if err := Insert(DBClient, dbName, items); err != nil {
 			log.Printf("Error inserting data points in batch: %v", err)
 		}
-	}
-}
-
-// Handler writes current state of the taxi data to the requester
-func Handler(w http.ResponseWriter, r *http.Request) {
-	res, err := getAllInLast(DBClient, "1h")
-
-	if err != nil {
-		log.Printf("Error fetching ride statistics: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("500 - Something bad happened!"))
-	} else {
-		json.NewEncoder(w).Encode(res)
-	}
-}
-
-type queryResult struct {
-	Count int64 `json:"count"`
-}
-
-func getAllInLast(c influx.Client, timeframe string) (*queryResult, error) {
-	// the dataset shows that a ride status is either 'enroute' or 'pickup'
-	// there is usually only 1 pickup per ride,
-	// so we approximate trips per X using the following expression
-	expression := fmt.Sprintf("select count(distinct(RideID)) from %s where RideStatus = 'pickup' and time > now() - %s", seriesName, timeframe)
-	q := influx.NewQuery(expression, dbName, "ns")
-	response, err := c.Query(q)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if err = response.Error(); err != nil {
-		return nil, err
-	}
-
-	if response.Results[0].Series == nil {
-		return &queryResult{Count: 0}, nil
-	} else {
-		num, err := response.Results[0].Series[0].Values[0][1].(json.Number).Int64()
-		if err != nil {
-			return nil, err
-		}
-
-		return &queryResult{Count: num}, nil
 	}
 }
 

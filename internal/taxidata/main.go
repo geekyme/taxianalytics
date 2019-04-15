@@ -1,8 +1,6 @@
 package taxidata
 
-import (
-	"time"
-)
+import "time"
 
 // TaxiData refers to the message data structure received through subscription to the taxi topic
 type TaxiData struct {
@@ -16,3 +14,14 @@ type TaxiData struct {
 	RideStatus     string    `json:"ride_status"`
 	PassengerCount int       `json:"passenger_count"`
 }
+
+// QueryResult refers to the structure we will send through a call to our handler
+type QueryResult struct {
+	Count int64 `json:"count"`
+}
+
+const (
+	dbName      = "taxianalytics"
+	seriesName  = "rides"
+	bufferCount = 500
+)
