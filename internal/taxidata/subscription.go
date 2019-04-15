@@ -130,7 +130,7 @@ func batchWriter(ch chan TaxiData) {
 
 // Handler writes current state of the taxi data to the requester
 func Handler(w http.ResponseWriter, r *http.Request) {
-	res, err := getAllInLast(DBClient, "1h")
+	res, err := getAllInLast(DBClient, "7d")
 
 	if err != nil {
 		log.Printf("Error fetching ride statistics: %v", err)
@@ -146,7 +146,7 @@ type queryResult struct {
 }
 
 func getAllInLast(c influx.Client, timeframe string) (*queryResult, error) {
-	expression := fmt.Sprintf("select count(RideID) from %s where time > now() - %s", seriesName, timeframe)
+	expression := fmt.Sprintf("select count(distinct(RideID)) from %s where RideStatus = 'pickup' and time > now() - %s", seriesName, timeframe)
 	q := influx.NewQuery(expression, dbName, "ns")
 	response, err := c.Query(q)
 
