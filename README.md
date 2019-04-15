@@ -4,7 +4,7 @@
 
 Above is the system design for this application. For simplicity, the 'Worker' logic and 'Visualizer' logic is handled in this same Go program.
 
-Major decision decisions:
+#### Major decision decisions
 
 1. Pull-based subscription so that multiple workers can consume from the same subscription, allowing us to scale up writes. [Read more](https://cloud.google.com/pubsub/docs/pull#pubsub-pull-messages-async-go)
 
@@ -14,7 +14,7 @@ Major decision decisions:
 
 4. Separate data processing, storage, and visualizing. We may want to visualize the same data points in various ways (rides / hr, avg meter reading) or scale up these individual concerns.
 
-Other considerations:
+#### Other considerations
 
 1. At larger scale / more complex requirements, we may want to ingest data into a pipeline of Apache Spark functions.
 
