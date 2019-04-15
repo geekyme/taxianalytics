@@ -146,6 +146,9 @@ type queryResult struct {
 }
 
 func getAllInLast(c influx.Client, timeframe string) (*queryResult, error) {
+	// the dataset shows that a ride status is either 'enroute' or 'pickup'
+	// there is usually only 1 pickup per ride,
+	// so we approximate trips per X using the following expression
 	expression := fmt.Sprintf("select count(distinct(RideID)) from %s where RideStatus = 'pickup' and time > now() - %s", seriesName, timeframe)
 	q := influx.NewQuery(expression, dbName, "ns")
 	response, err := c.Query(q)
