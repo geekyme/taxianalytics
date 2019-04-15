@@ -72,9 +72,10 @@ func configureSubscription(key []byte, project, topic string) (*pubsub.Subscript
 		return nil, err
 	}
 
-	subscription := client.Subscription(topic)
+	sub := client.Subscription(topic)
+	sub.ReceiveSettings.MaxOutstandingMessages = bufferCount
 
-	return subscription, nil
+	return sub, nil
 }
 
 // Subscribe takes in a subscription and runs callback functions
