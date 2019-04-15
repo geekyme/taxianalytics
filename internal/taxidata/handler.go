@@ -40,12 +40,12 @@ func getAllInLast(c influx.Client, timeframe string) (*QueryResult, error) {
 
 	if response.Results[0].Series == nil {
 		return &QueryResult{Count: 0}, nil
-	} else {
-		num, err := response.Results[0].Series[0].Values[0][1].(json.Number).Int64()
-		if err != nil {
-			return nil, err
-		}
-
-		return &QueryResult{Count: num}, nil
 	}
+
+	num, err := response.Results[0].Series[0].Values[0][1].(json.Number).Int64()
+	if err != nil {
+		return nil, err
+	}
+
+	return &QueryResult{Count: num}, nil
 }
