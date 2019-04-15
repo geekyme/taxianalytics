@@ -73,6 +73,8 @@ func configureSubscription(key []byte, project, topic string) (*pubsub.Subscript
 	}
 
 	sub := client.Subscription(topic)
+	// This is needed otherwise we risk this subscriber not Ack-ing a message
+	// We should scale horizontally to allow more workers to consume the message
 	sub.ReceiveSettings.MaxOutstandingMessages = bufferCount
 
 	return sub, nil
