@@ -57,25 +57,6 @@ func init() {
 	}
 }
 
-func configureSubscription(key []byte, project, topic string) (*pubsub.Subscription, error) {
-	ctx := context.Background()
-	client, err := pubsub.NewClient(ctx, project, option.WithCredentialsJSON(key))
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := client.Topic(topic).Exists(ctx); err != nil {
-		return nil, err
-	}
-
-	sub := client.Subscription(topic)
-	// This is needed otherwise we risk this subscriber not Ack-ing a message
-	// We should scale horizontally to allow more workers to consume the message
-	sub.ReceiveSettings.MaxOutstandingMessages = bufferCount
-
-	return sub, nil
-}
-
 // Subscribe takes in a subscription and runs callback functions
 func Subscribe(subscription *pubsub.Subscription) {
 	ctx := context.Background()
@@ -99,6 +80,25 @@ func Subscribe(subscription *pubsub.Subscription) {
 	}
 }
 
+func configureSubscription(key []byte, project, topic string) (*pubsub.Subscription, error) {
+	ctx := context.Background()
+	client, err := pubsub.NewClient(ctx, project, option.WithCredentialsJSON(key))
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := client.Topic(topic).Exists(ctx); err != nil {
+		return nil, err
+	}
+
+	sub := client.Subscription(topic)
+	// This is needed otherwise we risk this subscriber not Ack-ing a message
+	// We should scale horizontally to allow more workers to consume the message
+	sub.ReceiveSettings.MaxOutstandingMessages = bufferCount
+
+	return sub, nil
+}
+
 func batchWriter(ch chan TaxiData) {
 	for {
 		var items []TaxiData
@@ -118,14 +118,13 @@ func batchWriter(ch chan TaxiData) {
 			}
 		}
 
-		if err := Insert(DBClient, dbName, items); err != nil {
+		if err := insertPoints(DBClient, dbName, items); err != nil {
 			log.Printf("Error inserting data points in batch: %v", err)
 		}
 	}
 }
 
-// Insert saves points to database
-func Insert(c influx.Client, dbName string, items []TaxiData) error {
+func insertPoints(c influx.Client, dbName string, items []TaxiData) error {
 	// Create a new point batch
 	bp, err := influx.NewBatchPoints(influx.BatchPointsConfig{
 		Database: dbName,
