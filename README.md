@@ -43,7 +43,7 @@ Above is the system design for this application. For simplicity, the 'Worker' lo
 
 4. Set your google cloud project. `export TAXI_PROJECT=<gcloud_project_id>`
 
-5. Set the PubSub topic name. `export TAXI_PROJECT=<gcloud_pubsub_topic>`
+5. Set the PubSub topic name. `export TAXI_TOPIC=<gcloud_pubsub_topic>`
 
 6. Set the Database host name. `export DB_HOST=<influx_db_host>`
 
