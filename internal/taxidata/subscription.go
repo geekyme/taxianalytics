@@ -130,7 +130,7 @@ func batchWriter(ch chan TaxiData) {
 
 // Handler writes current state of the taxi data to the requester
 func Handler(w http.ResponseWriter, r *http.Request) {
-	res, err := getAllInLast(DBClient, "7d")
+	res, err := getAllInLast(DBClient, "1h")
 
 	if err != nil {
 		log.Printf("Error fetching ride statistics: %v", err)
