@@ -1,10 +1,14 @@
 #!/bin/sh
-echo "#### Running script to deploy to Minikube..."
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+echo "${GREEN}Running script to deploy to Minikube${NC}"
+
 
 APP=taxianalytics
 GCLOUD_KEY_FILE=key.json
 
-echo "#### Loading env variables..."
+echo "${GREEN}Loading env variables${NC}"
 if [ -z "$TAXI_TOPIC" ]
 then
   echo "env TAXI_TOPIC must be set!"
@@ -29,34 +33,38 @@ else
   echo "using env DB_HOST=$DB_HOST"
 fi
 
-echo "#### Checking code version..."
+echo "${GREEN}Checking code version${NC}"
 VERSION=$(git rev-parse --short HEAD)
 echo "Current version: $VERSION"
 export DOCKER_IMAGE_TAG=local/$APP:$VERSION
 
-echo "#### Finding gcloud key file..."
+echo "${GREEN}Finding gcloud key file${NC}"
 if [ ! -f $GCLOUD_KEY_FILE ]; then
-    echo "$GCLOUD_KEY_FILE not found!"
-    exit 1
+  echo "$GCLOUD_KEY_FILE not found!"
+  exit 1
+else
+  echo "Found $GCLOUD_KEY_FILE"
 fi
-echo "#### Loading gcloud key file..."
+
+echo "${GREEN}Loading gcloud key file${NC}"
 export GCLOUD_KEY=$(cat $GCLOUD_KEY_FILE)
+echo "Loaded"
 
-
-echo "#### Switching to docker daemon in Minikube..."
+echo "${GREEN}Switching to docker daemon in Minikube${NC}"
 eval $(minikube docker-env)
+echo "Switched"
 
-echo "#### Building image..."
+echo "${GREEN}Building image${NC}"
 docker build -t $DOCKER_IMAGE_TAG .
 
-echo "#### Updating deployment in Minikube..."
+echo "${GREEN}Updating deployment in Minikube${NC}"
 cat kubernetes/$APP-deployment.yaml | ./envsubst | kubectl apply -f -
 
-echo "#### Updating service in Minikube..."
+echo "${GREEN}Updating service in Minikube${NC}"
 export EXTERNAL_IP=$(minikube ip)
 cat kubernetes/$APP-service.yaml | ./envsubst | kubectl apply -f -
 
-echo "#### Getting app url..."
+echo "${GREEN}Getting app url${NC}"
 URL=$(minikube service $APP --url)
 echo "$APP deployed at $URL"
 
