@@ -9,12 +9,12 @@ APP=taxianalytics
 GCLOUD_KEY_FILE=key.json
 
 echo "${GREEN}Loading env variables${NC}"
-if [ -z "$TAXI_TOPIC" ]
+if [ -z "$TAXI_SUB_NAME" ]
 then
-  echo "env TAXI_TOPIC must be set!"
+  echo "env TAXI_SUB_NAME must be set!"
   exit 1
 else
-  echo "using env TAXI_TOPIC=$TAXI_TOPIC"
+  echo "using env TAXI_SUB_NAME=$TAXI_SUB_NAME"
 fi
 
 if [ -z "$TAXI_PROJECT" ]

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"time"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/fatih/structs"
@@ -28,8 +27,8 @@ func Subscribe(subscription *pubsub.Subscription) {
 		}
 
 		// overwrite the interpolated timestamp given by pubsub
-		// as the events are timestamped from the time of topic creation
-		data.Timestamp = time.Now()
+		// as the events are timestamped from the time of subName creation
+		// data.Timestamp = time.Now()
 
 		bufCh <- data
 		msg.Ack()
@@ -39,18 +38,14 @@ func Subscribe(subscription *pubsub.Subscription) {
 	}
 }
 
-func configureSubscription(key []byte, project, topic string) (*pubsub.Subscription, error) {
+func configureSubscription(key []byte, project, subName string) (*pubsub.Subscription, error) {
 	ctx := context.Background()
 	client, err := pubsub.NewClient(ctx, project, option.WithCredentialsJSON(key))
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := client.Topic(topic).Exists(ctx); err != nil {
-		return nil, err
-	}
-
-	sub := client.Subscription(topic)
+	sub := client.Subscription(subName)
 	// This is needed otherwise we risk this subscriber not Ack-ing a message
 	// We should scale horizontally to allow more workers to consume the message
 	sub.ReceiveSettings.MaxOutstandingMessages = bufferCount

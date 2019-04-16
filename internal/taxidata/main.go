@@ -10,7 +10,7 @@ import (
 	influx "github.com/influxdata/influxdb1-client/v2"
 )
 
-// TaxiData refers to the message data structure received through subscription to the taxi topic
+// TaxiData refers to the message data structure received through the subscription
 type TaxiData struct {
 	RideID         string    `json:"ride_id"`
 	PointIDX       int       `json:"point_idx"`
@@ -34,23 +34,23 @@ const (
 	seriesName  = "rides"
 	bufferCount = 500
 	// envs
-	topicEnv   = "TAXI_TOPIC"
+	subNameEnv = "TAXI_SUB_NAME"
 	keyEnv     = "GCLOUD_KEY"
 	projectEnv = "TAXI_PROJECT"
 	dbHostEnv  = "DB_HOST"
 )
 
 var (
-	// TaxiSubscription points to the active subscription we have on the taxi topic
+	// TaxiSubscription points to the taxi data subscription
 	TaxiSubscription *pubsub.Subscription
 	// DBClient points to the influx database client
 	DBClient influx.Client
 )
 
 func init() {
-	topic, project, key, dbHost := os.Getenv(topicEnv), os.Getenv(projectEnv), os.Getenv(keyEnv), os.Getenv(dbHostEnv)
-	if topic == "" {
-		log.Fatal(fmt.Sprintf("Must set env variable: %s", topicEnv))
+	subName, project, key, dbHost := os.Getenv(subNameEnv), os.Getenv(projectEnv), os.Getenv(keyEnv), os.Getenv(dbHostEnv)
+	if subName == "" {
+		log.Fatal(fmt.Sprintf("Must set env variable: %s", subNameEnv))
 	}
 	if project == "" {
 		log.Fatal(fmt.Sprintf("Must set env variable: %s", projectEnv))
@@ -63,7 +63,7 @@ func init() {
 	}
 
 	var err error
-	TaxiSubscription, err = configureSubscription([]byte(key), project, topic)
+	TaxiSubscription, err = configureSubscription([]byte(key), project, subName)
 	if err != nil {
 		log.Fatal(err)
 	}
