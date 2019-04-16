@@ -26,10 +26,6 @@ func Subscribe(subscription *pubsub.Subscription) {
 			return
 		}
 
-		// overwrite the interpolated timestamp given by pubsub
-		// as the events are timestamped from the time of subName creation
-		// data.Timestamp = time.Now()
-
 		bufCh <- data
 		msg.Ack()
 	})
